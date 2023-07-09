@@ -1,0 +1,5 @@
+multiple_app_files: ["/home/joq62/erlang/paas/sys_boot/_build/default/lib/etcd/ebin/etcd.app",
+                     "/home/joq62/erlang/paas/sys_boot/_build/default/lib/etcd/ebin/lib_leader.app",
+                     "/home/joq62/erlang/paas/sys_boot/_build/default/lib/etcd/ebin/lib_sd.app"]
+[]
+
