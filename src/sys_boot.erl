@@ -14,6 +14,9 @@
 -include("log.api").
 %% API
 -export([
+	 get_node/1,
+	 deploy/1,
+	 is_deployed/1,
 	 store_deployments/1,
 	 ping/0]).
 
@@ -26,7 +29,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {}).
+-record(state, {deployment_specs}).
 
 %%%===================================================================
 %%% API
@@ -55,7 +58,17 @@ start_link() ->
 store_deployments(DeploymentSpec)->
     gen_server:call(?SERVER, {store_deployments,DeploymentSpec},infinity).    
     
+deploy(DeploymentId)->
+    gen_server:call(?SERVER, {deploy,DeploymentId},infinity).    
+    
 
+
+get_node(DeploymentId)->
+    gen_server:call(?SERVER, {get_node,DeploymentId},infinity).    
+
+is_deployed(DeploymentId)->
+    gen_server:call(?SERVER, {is_deployed,DeploymentId},infinity).    
+    
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -79,7 +92,7 @@ ping()->
 init([]) ->
     ok=application:start(etcd),
     
-    {ok, #state{}}.
+    {ok, #state{deployment_specs=[]}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -87,19 +100,20 @@ init([]) ->
 %% Handling call messages
 %% @end
 %%--------------------------------------------------------------------
--spec handle_call(Request :: term(), From :: {pid(), term()}, State :: term()) ->
-	  {reply, Reply :: term(), NewState :: term()} |
-	  {reply, Reply :: term(), NewState :: term(), Timeout :: timeout()} |
-	  {reply, Reply :: term(), NewState :: term(), hibernate} |
-	  {noreply, NewState :: term()} |
-	  {noreply, NewState :: term(), Timeout :: timeout()} |
-	  {noreply, NewState :: term(), hibernate} |
-	  {stop, Reason :: term(), Reply :: term(), NewState :: term()} |
-	  {stop, Reason :: term(), NewState :: term()}.
-
 handle_call({store_deployments,DeploymentSpec}, _From, State) ->
-    {ok,Deployment}=db_deployment_spec:read(deployment,DeploymentSpec),
-    Reply = [vm_appl_control:create_deployment(DeploymentSpec,ProviderSpec,HostSpec)||{ProviderSpec,HostSpec}<-Deployment],
+    Reply=lib_sys_boot:store_deployments(DeploymentSpec),
+    {reply, Reply, State};
+
+handle_call({get_node,DeploymentId}, _From, State) ->
+    Reply=lib_sys_boot:get_node(DeploymentId),
+    {reply, Reply, State};
+
+handle_call({deploy,DeploymentId}, _From, State) ->
+    Reply=lib_sys_boot:deploy(DeploymentId),
+    {reply, Reply, State};
+
+handle_call({is_deployed,DeploymentId}, _From, State) ->
+    Reply=lib_sys_boot:is_deployed(DeploymentId),
     {reply, Reply, State};
 
 handle_call({ping}, _From, State) ->
