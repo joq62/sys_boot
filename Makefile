@@ -58,5 +58,5 @@ eunit:
 	    -pa ../control/ebin\
 	    -sname do_test\
 	    -run $(m) start\
-	    -setcookie test_cookie\
-	    -hidden
+	    -setcookie test_cookie
+#	    -hidden

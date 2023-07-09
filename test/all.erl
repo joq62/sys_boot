@@ -33,7 +33,7 @@ start()->
 
     io:format("Test OK !!! ~p~n",[?MODULE]),
     timer:sleep(2000),
- %   init:stop(),
+    init:stop(),
     ok.
 
 %% --------------------------------------------------------------------
@@ -44,8 +44,25 @@ start()->
 etcd_test()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
-    DeploymentIds=sys_boot:store_deployments(?TestDeploy),
-    io:format("DeploymentIds ~p~n",[DeploymentIds]),
+    DeploymentSpecs=sys_boot:store_deployments(?TestDeploy),
+    %% Find etcd
+
+    EtcdDeploymentSpecs=[DeploySpec||{ok,DeploySpec}<-DeploymentSpecs,
+				     {ok,"etcd"}==db_deploy:read(provider_spec,DeploySpec)],
+	       
+    io:format("EtcdDeploymentSpecs ~p~n",[EtcdDeploymentSpecs]),
+    [EtcdSpec1|_]=EtcdDeploymentSpecs,
+    io:format("EtcdSpec1 ~p~n",[EtcdSpec1]),
+
+    %% Deploy Etcd 1
+
+    %% Ensure dbase is loaded to Etcd1
+
+
+    %% Deploy control 
+
+    %% There you go!
+    
     
     
 
