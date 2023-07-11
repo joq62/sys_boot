@@ -43,7 +43,7 @@ start()->
 loop()->
     io:format("Start ~p~n",[{time(),?MODULE,?FUNCTION_NAME}]),
     io:format("sd all ~p~n",[sd:all()]),
-    timer:sleep(30*1000),
+    timer:sleep(12*1000),
     
     loop().
 %%--------------------------------------------------------------------
@@ -53,7 +53,14 @@ loop()->
 %%--------------------------------------------------------------------
 delete_provider_dirs()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    {ok,[HomeDir]}=ssh_server:send_msg("c50","pwd",5000),
+    HostSpec="c50",
+    {ok,Ip}=sd:call(etcd,db_host_spec,read,[local_ip,HostSpec],5000),
+    {ok,Port}=sd:call(etcd,db_host_spec,read,[ssh_port,HostSpec],5000),
+    {ok,Uid}=sd:call(etcd,db_host_spec,read,[uid,HostSpec],5000),
+    {ok,Pwd}=sd:call(etcd,db_host_spec,read,[passwd,HostSpec],5000),
+    TimeOut=5000,
+    LinuxCmd="pwd",
+    {ok,[HomeDir]}=ssh_server:send_msg(Ip,Port,Uid,Pwd,LinuxCmd,TimeOut),
     {ok,Files}=file:list_dir(HomeDir),
     ProviderDirs=[filename:join(HomeDir,File)||File<-Files,
 					       ".provider_dir"==filename:extension(File)],
