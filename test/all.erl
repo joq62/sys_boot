@@ -42,7 +42,11 @@ start()->
 
 loop()->
     io:format("Start ~p~n",[{time(),?MODULE,?FUNCTION_NAME}]),
-    io:format("sd all ~p~n",[sd:all()]),
+%     io:format("sd all ~p~n",[sd:all()]),
+%    EtcdNodes=sd:get_node(etcd),
+ %   SystemInfo=[{N,rpc:call(N,mnesia,system_info,[],5000)}||N<-EtcdNodes],
+  %  io:format("SystemInfo~p~n",[SystemInfo]),
+   
     timer:sleep(12*1000),
     
     loop().
