@@ -57,6 +57,6 @@ eunit:
 	    -pa ../etcd/ebin\
 	    -pa ../control/ebin\
 	    -sname do_test\
-	    -run $(m) start\
+	    -run $(m) start $(d) $(c)\
 	    -setcookie test_cookie
 #	    -hidden

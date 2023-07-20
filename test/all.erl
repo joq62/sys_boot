@@ -11,7 +11,7 @@
 %%% -------------------------------------------------------------------
 -module(all).      
  
--export([start/0]).
+-export([start/2]).
 
 -define(TestDeploy,"test").
 
@@ -25,10 +25,11 @@
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
-start()->
+start(DeploymentSpec,Cookie)->
    
-    ok=setup(),
-    ok=delete_provider_dirs(),
+    ok=setup(DeploymentSpec,Cookie),
+    ok=delete_provider_dirs("c50"),
+    ok=delete_provider_dirs("c200"),
     ok=etcd_test(),
 
     ok=loop(),
@@ -47,7 +48,7 @@ loop()->
  %   SystemInfo=[{N,rpc:call(N,mnesia,system_info,[],5000)}||N<-EtcdNodes],
   %  io:format("SystemInfo~p~n",[SystemInfo]),
    
-    timer:sleep(12*1000),
+    timer:sleep(30*1000),
     
     loop().
 %%--------------------------------------------------------------------
@@ -55,9 +56,10 @@ loop()->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-delete_provider_dirs()->
+delete_provider_dirs(HostSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    HostSpec="c50",
+    io:format("HostSpec ~p~n",[{HostSpec,?MODULE,?FUNCTION_NAME}]),
+ %   HostSpec="c50",
     {ok,Ip}=sd:call(etcd,db_host_spec,read,[local_ip,HostSpec],5000),
     {ok,Port}=sd:call(etcd,db_host_spec,read,[ssh_port,HostSpec],5000),
     {ok,Uid}=sd:call(etcd,db_host_spec,read,[uid,HostSpec],5000),
@@ -65,13 +67,18 @@ delete_provider_dirs()->
     TimeOut=5000,
     LinuxCmd="pwd",
     {ok,[HomeDir]}=ssh_server:send_msg(Ip,Port,Uid,Pwd,LinuxCmd,TimeOut),
-    {ok,Files}=file:list_dir(HomeDir),
+    io:format("HomeDir ~p~n",[{HomeDir,?MODULE,?FUNCTION_NAME,?LINE}]),
+    {ok,Files}=ssh_server:send_msg(Ip,Port,Uid,Pwd,"ls ",TimeOut),
+    io:format("Files ~p~n",[{Files,?MODULE,?FUNCTION_NAME,?LINE}]),
+%    {ok,Files}=file:list_dir(HomeDir),
     ProviderDirs=[filename:join(HomeDir,File)||File<-Files,
 					       ".provider_dir"==filename:extension(File)],
-    DelDir=[{file:del_dir_r(File),File}||File<-ProviderDirs],
+    
+    DelDir=[{ssh_server:send_msg(Ip,Port,Uid,Pwd,"rm -r "++File,TimeOut),File}||File<-ProviderDirs],
+  %  DelDir=[{file:del_dir_r(File),File}||File<-ProviderDirs],
     io:format("DelDir ~p~n",[{DelDir,?MODULE,?FUNCTION_NAME,?LINE}]),
     
-    {ok,Files2}=file:list_dir(HomeDir),
+    {ok,Files2}=ssh_server:send_msg(Ip,Port,Uid,Pwd,"ls ",TimeOut),
     []=[filename:join(HomeDir,File)||File<-Files2,
 					    ".provider_dir"==filename:extension(File)],
    
@@ -133,12 +140,13 @@ etcd_test()->
 %% --------------------------------------------------------------------
 
 
-setup()->
+setup(DeploymentSpec,Cookie)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    os:cmd("service ssh start "),
 
     ok=application:start(log),
     pong=log:ping(),
-    ok=application:start(sys_boot),
+    ok=sys_boot:start(DeploymentSpec,Cookie),
     pong=sys_boot:ping(),
     pong=ssh_server:ping(),
     pong=etcd:ping(),

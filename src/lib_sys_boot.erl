@@ -10,6 +10,7 @@
 
 %% API
 -export([
+	 init_monitor_nodes/0,
 	 store_deployments/1,
 	 deploy/1,
 	 is_deployed/1,
@@ -19,6 +20,19 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+init_monitor_nodes()->
+    AllDeploymentsId=db_deploy:get_all_id(),
+    init_monitor_nodes(AllDeploymentsId).
+  
+init_monitor_nodes([Id|T])->
+    {ok,Node}=db_deploy:read(node,Id),
+    erlang:monitor_node(Node,true),
+    init_monitor_nodes(T).
 
 %%--------------------------------------------------------------------
 %% @doc

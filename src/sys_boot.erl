@@ -21,7 +21,9 @@
 	 ping/0]).
 
 
--export([start_link/0]).
+-export([
+	 start/2,
+	 start_link/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -29,11 +31,16 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {deployment_specs}).
+-record(state, {deployment_spec}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
+start(DeploymentSpec,CookieStr)->
+    application:set_env([{sys_boot,[{deployment_spec,DeploymentSpec},
+				    {cookie_str,CookieStr}]}]),
+    application:start(sys_boot).
+    
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -90,9 +97,15 @@ ping()->
 	  {stop, Reason :: term()} |
 	  ignore.
 init([]) ->
-    ok=application:start(etcd),
+    {ok,DeploymentSpec}=application:get_env(deployment_spec),
+    {ok,CookieStr}=application:get_env(cookie_str),
+    Cookie=list_to_atom(CookieStr),
+    true=erlang:set_cookie(node(),Cookie),
     
-    {ok, #state{deployment_specs=[]}}.
+    ok=application:start(etcd),
+    lib_sys_boot:store_deployments(DeploymentSpec),
+    
+    {ok, #state{deployment_spec=DeploymentSpec}}.
 
 %%--------------------------------------------------------------------
 %% @private
