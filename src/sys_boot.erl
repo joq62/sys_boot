@@ -22,7 +22,7 @@
 
 
 -export([
-	 start/2,
+	 start/1,
 	 start_link/0]).
 
 %% gen_server callbacks
@@ -31,14 +31,13 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {deployment_spec}).
+-record(state, {cluster_spec}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
-start(DeploymentSpec,CookieStr)->
-    application:set_env([{sys_boot,[{deployment_spec,DeploymentSpec},
-				    {cookie_str,CookieStr}]}]),
+start(ClusterSpec)->
+    application:set_env([{sys_boot,[{cluster_spec,ClusterSpec}]}]),
     application:start(sys_boot).
     
 
@@ -97,15 +96,18 @@ ping()->
 	  {stop, Reason :: term()} |
 	  ignore.
 init([]) ->
-    {ok,DeploymentSpec}=application:get_env(deployment_spec),
-    {ok,CookieStr}=application:get_env(cookie_str),
-    Cookie=list_to_atom(CookieStr),
-    true=erlang:set_cookie(node(),Cookie),
-    
+    ok=application:start(log),
     ok=application:start(etcd),
-    lib_sys_boot:store_deployments(DeploymentSpec),
+    pong=log:ping(),
+    pong=ssh_server:ping(),
     
-    {ok, #state{deployment_spec=DeploymentSpec}}.
+    {ok,ClusterSpec}=application:get_env(cluster_spec),
+    {ok,CookieStr}=db_cluster_spec:read(cookie_str,ClusterSpec),
+    {atomic,ok}=db_cluster:create(node(),ClusterSpec),
+    [SpecId]=db_cluster:get_all_id(),
+    {ok,ClusterSpec}=db_cluster:read(cluster_spec,SpecId),
+   
+    {ok, #state{cluster_spec=ClusterSpec}}.
 
 %%--------------------------------------------------------------------
 %% @private

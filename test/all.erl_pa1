@@ -13,6 +13,7 @@
  
 -export([start/1]).
 
+-define(ClusterSpec,"test_c50").
 
 %% --------------------------------------------------------------------
 %% Include files
@@ -29,7 +30,7 @@ start([ClusterSpec])->
     ok=setup(ClusterSpec),
     ok=delete_provider_dirs("c50"),
   
-  %  ok=loop(),
+    ok=loop(),
 
     io:format("Test OK !!! ~p~n",[?MODULE]),
     timer:sleep(2000),
@@ -79,6 +80,8 @@ delete_provider_dirs(HostSpec)->
     []=[filename:join(HomeDir,File)||File<-Files2,
 					    ".provider_dir"==filename:extension(File)],
    
+    
+
     ok.
     
 
@@ -87,7 +90,47 @@ delete_provider_dirs(HostSpec)->
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
+etcd_test()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
+    DeploymentSpecs=sys_boot:store_deployments(?TestDeploy),
+    %% Find etcd
+
+    EtcdDeploymentIds=[DeploySpec||{ok,DeploySpec}<-DeploymentSpecs,
+				     {ok,"etcd"}==db_deploy:read(provider_spec,DeploySpec)],
+	       
+    io:format("EtcdDeploymentIds ~p~n",[EtcdDeploymentIds]),
+    [EtcdId1|_]=EtcdDeploymentIds,
+    io:format("EtcdSpec1 ~p~n",[{EtcdId1,?MODULE,?LINE,?FUNCTION_NAME}]),
+
+    %% Deploy Etcd 1
+    
+    {ok,EtcdId1}=sys_boot:deploy(EtcdId1),
+    {ok,NodeEtcd1}=sys_boot:get_node(EtcdId1),
+    %% Ensure dbase is loaded to Etcd1
+    io:format("~p~n",[{NodeEtcd1,rpc:call(NodeEtcd1,mnesia,system_info,[],5000)}]),
+
+
+    %% Deploy control 
+
+    ControlDeploymentIds=[DeploySpec||{ok,DeploySpec}<-DeploymentSpecs,
+				   {ok,"control"}==db_deploy:read(provider_spec,DeploySpec)],
+    
+    io:format("ControlDeploymentIds ~p~n",[{ControlDeploymentIds,?MODULE,?LINE,?FUNCTION_NAME}]),
+    [ControlId1|_]=ControlDeploymentIds,
+    io:format("ControlId1 ~p~n",[{ControlId1,?MODULE,?LINE,?FUNCTION_NAME}]),
+
+    %% Deploy Etcd 1
+    
+    {ok,ControlId1}=sys_boot:deploy(ControlId1),
+    {ok,NodeControlId1}=sys_boot:get_node(ControlId1),
+    %% Ensure dbase is loaded to Etcd1
+    io:format("~p~n",[{NodeControlId1,rpc:call(NodeControlId1,control,ping,[],5000)}]),
+    %% There you go!
+    
+    io:format("sd all ~p~n",[sd:all()]),
+    
+    ok.
 %% --------------------------------------------------------------------
 %% Function: available_hosts()
 %% Description: Based on hosts.config file checks which hosts are avaible
@@ -95,10 +138,13 @@ delete_provider_dirs(HostSpec)->
 %% --------------------------------------------------------------------
 
 
-setup(ClusterSpec)->
+setup(clusterSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
     
+    os:cmd("service ssh start "),
+    ok=application:start(log),
+    pong=log:ping(),
+    pong=ssh_server:ping(),
     ok=sys_boot:start(ClusterSpec),
     pong=sys_boot:ping(),
-
     ok.
