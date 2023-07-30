@@ -102,11 +102,17 @@ init([]) ->
     pong=ssh_server:ping(),
     
     {ok,ClusterSpec}=application:get_env(cluster_spec),
-    {ok,CookieStr}=db_cluster_spec:read(cookie_str,ClusterSpec),
-    {atomic,ok}=db_cluster:create(node(),ClusterSpec),
-    [SpecId]=db_cluster:get_all_id(),
-    {ok,ClusterSpec}=db_cluster:read(cluster_spec,SpecId),
-   
+    %% 
+    ok=etcd_cluster_to_deploy:create(ClusterSpec,node()),
+    %% Create Wanted state
+DeploymentRecords=
+    
+    
+    {ok,CookieStr}=etcd_cluster:get_cookie_str(ClusterSpec),
+    [ClusterSpec]=etcd_cluster:all_clusters(),
+    {ok,ClusterSpec}=etcd_cluster_to_deploy:get_cluster_spec(),
+    
+    
     {ok, #state{cluster_spec=ClusterSpec}}.
 
 %%--------------------------------------------------------------------
