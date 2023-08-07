@@ -21,7 +21,8 @@ build:
 	rm -rf ebin
 	rm -rf rebar.lock;
 	mkdir ebin;
-	erlc -I include -I /home/joq62/erlang/include -o ebin ../etcd/src/*.erl;
+	erlc -I include -I /home/joq62/erlang/paas/etcd/include\
+	     -I /home/joq62/erlang/paas/etcd/include -o ebin ../etcd/src/*.erl;
 	erlc -I include -I /home/joq62/erlang/include -o ebin ../control/src/*.erl; 
 	rebar3 compile;	
 	cp _build/default/lib/*/ebin/* ebin;

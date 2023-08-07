@@ -96,64 +96,28 @@ ping()->
 	  {stop, Reason :: term()} |
 	  ignore.
 init([]) ->
-
-   % ok=application:start(log),
-   % pong=log:ping(),
-    
+    pong=log:ping(),
+    pong=ssh_server:ping(),
+    ok=application:start(etcd),
+    pong=etcd:ping(),
+    timer:sleep(2000),
     {ok,ClusterSpec}=application:get_env(cluster_spec),    
-    ok=lib_sys_boot:init_etcd(ClusterSpec),
-    pong=sd:call(etcd,etcd,ping,[],5000),
-
+    %% Init etcd with ClusterSpec specific info
+    Lock=list_to_atom(ClusterSpec),
+    ok=etcd_paas_config:create(ClusterSpec,Lock),
     {ok,CookieStr}=etcd_cluster:get_cookie_str(ClusterSpec),
     true=erlang:set_cookie(list_to_atom(CookieStr)),
-
-     ok=lib_sys_boot:init_control(),
-
-    %% delete nodes
-    {ok,DeploymentRecords}=etcd_cluster:get_deployment_records(ClusterSpec),
-    
-    StoppedNodes=[control_node:stop_node(DeploymentRecord)||DeploymentRecord<-DeploymentRecords],
+    ok=etcd_lock:create(ClusterSpec),
+    {ok,DeploymentRecords}=etcd_deployment_record:create_records(ClusterSpec),
+    ok=etcd_cluster:set_deployment_records(DeploymentRecords,ClusterSpec),
+    %% delete providers
+    StoppedNodes=lib_sys_boot:stop_nodes(ClusterSpec),
     io:format("StoppedNodes ~p~n",[{StoppedNodes,?MODULE,?LINE}]),
     
-    %% Load_Start one instance of log 
-    [LogRecord|_]=[DeploymentRecord||DeploymentRecord<-DeploymentRecords,
-				      {ok,"log"}==etcd_deployment_record:get_provider(DeploymentRecord)],
-    ok=control_node:start_node(LogRecord,ClusterSpec),
-    true=control_node:is_alive(LogRecord),
-
-    ok=control_provider:load_provider(LogRecord),
-    ok=control_provider:start_provider(LogRecord),
-    true=control_provider:is_alive(LogRecord),
-    io:format("Started LogRecord ~p~n",[{LogRecord,?MODULE,?LINE}]),
-
     %% Load_Start one instance of etcd 
-    [EtcdRecord|_]=[DeploymentRecord||DeploymentRecord<-DeploymentRecords,
-				      {ok,"etcd"}==etcd_deployment_record:get_provider(DeploymentRecord)],
-    ok=control_node:start_node(EtcdRecord,ClusterSpec),
-    true=control_node:is_alive(EtcdRecord),
-
-    ok=control_provider:load_provider(EtcdRecord),
-    ok=control_provider:start_provider(EtcdRecord),
-    true=control_provider:is_alive(EtcdRecord),
-    io:format("Started EtcdRecord ~p~n",[{EtcdRecord,?MODULE,?LINE}]),
+    
 
     %% Load_Start one instance of control     
-    [ControlRecord|_]=[DeploymentRecord||DeploymentRecord<-DeploymentRecords,
-				      {ok,"control"}==etcd_deployment_record:get_provider(DeploymentRecord)],
-    ok=control_node:start_node(ControlRecord,ClusterSpec),
-    true=control_node:is_alive(ControlRecord),
-
-    ok=control_provider:load_provider(ControlRecord),
-    ok=control_provider:start_provider(ControlRecord),
-    true=control_provider:is_alive(ControlRecord),
-    io:format("Started ControlRecord ~p~n",[{ControlRecord,?MODULE,?LINE}]),
-
-    %%
-    application:stop(etcd),
-    application:unload(etcd),
-    application:stop(control),
-    application:unload(control),
-    
 
     {ok, #state{cluster_spec=ClusterSpec}}.
 

@@ -10,9 +10,14 @@
 
 %% API
 -export([
+	 init_etcd/1,
+	 init_control/0,
+
+	 stop_nodes/1,
+	 delete_providers/1,
 	 init_monitor_nodes/0,
 	 store_deployments/1,
-	 deploy/1,
+	
 	 is_deployed/1,
 	 get_node/1
 	]).
@@ -20,6 +25,82 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+init_etcd(ClusterSpec)->
+    ok=application:start(etcd),
+    Lock=list_to_atom(ClusterSpec),
+    ok=etcd_paas_config:create(ClusterSpec,Lock),
+    ok=etcd_lock:create(Lock),
+    {ok,DeploymentRecords}=etcd_deployment_record:create_records(ClusterSpec),
+    ok=etcd_cluster:set_deployment_records(DeploymentRecords,ClusterSpec),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+init_control()->
+    ok=application:start(control),
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
+stop_nodes(ClusterSpec)->
+    {ok,DeploymentRecords}=etcd_cluster:get_deployment_records(ClusterSpec),
+    stop_nodes(DeploymentRecords,[]).
+    
+stop_nodes([],Acc)->    
+    Acc;
+stop_nodes([DeploymentRecord|T],Acc)->
+    R=lib_control_node:stop_node(DeploymentRecord),
+    stop_nodes(T,[R|Acc]).
+    
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+delete_providers(ClusterSpec)->
+    {ok,DeploymentRecords}=etcd_cluster:get_deployment_records(ClusterSpec),
+    delete_providers(DeploymentRecords,[]).
+    
+    
+delete_providers([],Acc)->
+    Acc;
+delete_providers([DeploymentRecord|T],Acc)->
+    {ok,Node}=etcd_deployment_record:get_node(DeploymentRecord),
+    {ok,Dir}=etcd_deployment_record:get_dir(DeploymentRecord),
+    {ok,HostSpec}=etcd_deployment_record:get_host(DeploymentRecord),
+    
+    %% Stop Node
+    rpc:call(Node,init,stop,[],5000),
+    
+    {ok,Ip}=sd:call(etcd,etcd_host,get_ip,[HostSpec],5000),
+    {ok,Port}=sd:call(etcd,etcd_host,get_port,[HostSpec],5000),
+    {ok,Uid}=sd:call(etcd,etcd_host,get_user,[HostSpec],5000),
+    {ok,Pwd}=sd:call(etcd,etcd_host,get_passwd,[HostSpec],5000),
+    TimeOut=5000,
+    LinuxCmd="pwd",
+    {ok,[HomeDir]}=ssh_server:send_msg(Ip,Port,Uid,Pwd,LinuxCmd,TimeOut),
+    ProviderDir=filename:join(HomeDir,Dir),
+    DelDir=ssh_server:send_msg(Ip,Port,Uid,Pwd,"rm -r "++ProviderDir,TimeOut),
+    NewAcc=case DelDir of
+	       {ok,[]}->
+		   [{ok,ProviderDir}|Acc];
+	       Error->
+		   [Error|Acc]
+	   end,
+    delete_providers(T,NewAcc).
+
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
@@ -48,8 +129,7 @@ store_deployments(DeploymentSpec)->
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-deploy(DeploymentId)->
-    vm_appl_control:start_deployment(DeploymentId).
+
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec

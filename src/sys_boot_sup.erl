@@ -30,10 +30,12 @@ init([]) ->
                  intensity => 0,
                  period => 1},
     ChildSpecs = [
-		  #{id=>lib_ssh,
-		    start=>{ssh_server,start_link,[]}},
+	%	  #{id=>log,
+	%	    start=>{log,start_link,[]}},
+	%	  #{id=>lib_ssh,
+	%	    start=>{ssh_server,start_link,[]}},
 		  #{id=>sys_boot,
-		   start=>{sys_boot,start_link,[]}}
+		    start=>{sys_boot,start_link,[]}}
 		 ],
     {ok, {SupFlags, ChildSpecs}}.
 
